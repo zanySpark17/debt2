@@ -1,735 +1,600 @@
 """
-DebtFree Advisor - Smart Debt Payoff Platform for W-2 Employees
+DebtFree Advisor v2 — Smart Debt Payoff Platform for W-2 Employees
 Run with: streamlit run debt_advisor.py
-Dependencies: pip install streamlit plotly pandas
+Requirements: pip install streamlit plotly pandas
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from datetime import date, timedelta
 import math
 
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
 # PAGE CONFIG
-# ─────────────────────────────────────────────
-st.set_page_config(
-    page_title="DebtFree Advisor",
-    page_icon="💳",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# ─────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="DebtFree Advisor", page_icon="💳", layout="wide", initial_sidebar_state="expanded")
 
-# ─────────────────────────────────────────────
-# CUSTOM CSS
-# ─────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+html, body, [class*="css"] { font-family: 'Sora', sans-serif; }
 
-html, body, [class*="css"] {
-    font-family: 'Sora', sans-serif;
-}
+.hero { background: linear-gradient(135deg,#0f1f2e,#0d1117,#0f1f2e); border:1px solid #30363d; border-radius:16px; padding:1.8rem 2.5rem; margin-bottom:1.5rem; }
+.hero h1 { font-size:2rem; font-weight:700; color:#e6edf3; margin:0; }
+.hero p  { color:#8b949e; margin:0.3rem 0 0; font-size:0.95rem; }
+.accent  { color:#00d4aa; }
 
-.main { background: #0d1117; }
+.kpi-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.2rem; }
+.kpi { flex:1; min-width:150px; background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1.1rem 1.4rem; }
+.kpi:hover { border-color:#00d4aa44; }
+.kpi-label { font-size:0.7rem; color:#8b949e; text-transform:uppercase; letter-spacing:.09em; margin-bottom:.3rem; }
+.kpi-val   { font-size:1.55rem; font-weight:700; font-family:'JetBrains Mono',monospace; }
+.kpi-sub   { font-size:0.72rem; color:#6e7681; margin-top:.15rem; }
+.green{color:#3fb950;} .red{color:#f85149;} .yellow{color:#e3b341;} .blue{color:#58a6ff;} .teal{color:#00d4aa;}
 
-/* Header */
-.hero-header {
-    background: linear-gradient(135deg, #1a2332 0%, #0d1117 50%, #1a2332 100%);
-    border: 1px solid #30363d;
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-bottom: 1.5rem;
-    position: relative;
-    overflow: hidden;
-}
-.hero-header::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at 30% 50%, rgba(0,200,150,0.06) 0%, transparent 60%);
-    pointer-events: none;
-}
-.hero-title {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: #e6edf3;
-    margin: 0;
-}
-.hero-subtitle {
-    color: #8b949e;
-    font-size: 1rem;
-    margin-top: 0.3rem;
-}
-.accent { color: #00d4aa; }
+.advisor { background:linear-gradient(135deg,#0d2818,#0a1a0a); border:1px solid #00d4aa33; border-left:4px solid #00d4aa; border-radius:12px; padding:1.2rem 1.8rem; margin:.6rem 0; }
+.advisor-title { color:#00d4aa; font-weight:600; margin-bottom:.6rem; font-size:.95rem; }
+.advisor-body  { color:#c9d1d9; font-size:.88rem; line-height:1.75; }
 
-/* Metric cards */
-.metric-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-.metric-card {
-    flex: 1;
-    min-width: 160px;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 1.2rem 1.5rem;
-    transition: border-color 0.2s;
-}
-.metric-card:hover { border-color: #00d4aa; }
-.metric-label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
-.metric-value { font-size: 1.7rem; font-weight: 700; color: #e6edf3; font-family: 'JetBrains Mono', monospace; }
-.metric-value.green { color: #3fb950; }
-.metric-value.red { color: #f85149; }
-.metric-value.yellow { color: #e3b341; }
-.metric-value.blue { color: #58a6ff; }
-.metric-delta { font-size: 0.78rem; color: #8b949e; margin-top: 0.2rem; }
+.warn   { background:#1f1500; border:1px solid #e3b34133; border-left:4px solid #e3b341; border-radius:12px; padding:1rem 1.5rem; color:#e3b341; font-size:.86rem; margin:.6rem 0; }
+.danger { background:#1f0d0d; border:1px solid #f8514933; border-left:4px solid #f85149; border-radius:12px; padding:1rem 1.5rem; color:#f85149; font-size:.86rem; margin:.6rem 0; }
 
-/* Advisor box */
-.advisor-box {
-    background: linear-gradient(135deg, #0d2818 0%, #0d1a0d 100%);
-    border: 1px solid #00d4aa44;
-    border-left: 4px solid #00d4aa;
-    border-radius: 12px;
-    padding: 1.5rem 2rem;
-    margin: 1rem 0;
-}
-.advisor-title { color: #00d4aa; font-weight: 600; font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
-.advisor-text { color: #c9d1d9; font-size: 0.9rem; line-height: 1.7; }
-.advisor-text ul { margin: 0.5rem 0; padding-left: 1.2rem; }
-.advisor-text li { margin-bottom: 0.4rem; }
+.scenario-card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:.8rem; }
+.sec-header { font-size:1.05rem; font-weight:600; color:#e6edf3; margin:1.5rem 0 .7rem; padding-bottom:.4rem; border-bottom:1px solid #21262d; }
 
-/* Warning box */
-.warning-box {
-    background: #1f1500;
-    border: 1px solid #e3b34144;
-    border-left: 4px solid #e3b341;
-    border-radius: 12px;
-    padding: 1rem 1.5rem;
-    margin: 0.8rem 0;
-    color: #e3b341;
-    font-size: 0.88rem;
-}
-
-/* Debt item row */
-.debt-item {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 1rem 1.3rem;
-    margin-bottom: 0.7rem;
-}
-
-/* Section header */
-.section-header {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #e6edf3;
-    margin: 1.5rem 0 0.8rem 0;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #21262d;
-}
-
-/* Strategy badge */
-.badge {
-    display: inline-block;
-    padding: 0.2rem 0.7rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin: 0.2rem;
-}
-.badge-green { background: #0d2818; color: #3fb950; border: 1px solid #3fb95044; }
-.badge-red { background: #2d1117; color: #f85149; border: 1px solid #f8514944; }
-.badge-blue { background: #0d1a2d; color: #58a6ff; border: 1px solid #58a6ff44; }
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #0d1117;
-    border-right: 1px solid #21262d;
-}
-
-/* Buttons */
-div.stButton > button {
-    background: #00d4aa;
-    color: #0d1117;
-    font-weight: 700;
-    border: none;
-    border-radius: 8px;
-    padding: 0.5rem 1.5rem;
-    font-family: 'Sora', sans-serif;
-    transition: all 0.2s;
-}
-div.stButton > button:hover {
-    background: #00f0c0;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(0,212,170,0.3);
-}
-
-/* Tables */
-.stDataFrame { border-radius: 10px; overflow: hidden; }
-
-/* Expander */
-.streamlit-expanderHeader { color: #58a6ff !important; }
+section[data-testid="stSidebar"] { background:#0d1117; border-right:1px solid #21262d; }
+div.stButton>button { background:#00d4aa; color:#0d1117; font-weight:700; border:none; border-radius:8px; padding:.45rem 1.4rem; font-family:'Sora',sans-serif; }
+div.stButton>button:hover { background:#00f0c0; box-shadow:0 4px 18px rgba(0,212,170,.3); }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ─────────────────────────────────────────────
-# SESSION STATE INIT
-# ─────────────────────────────────────────────
-def init_state():
+# ─────────────────────────────────────────────────────────────────
+# SESSION STATE
+# ─────────────────────────────────────────────────────────────────
+def init():
     defaults = {
-        "income": 5000.0,
-        "income_freq": "Monthly",
+        "incomes": [],
+        "future_income": [],
         "debts": [],
-        "extra_payment": 0.0,
-        "strategy": "Avalanche (Highest Interest First)",
+        "strategy": "Avalanche",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+init()
 
-init_state()
+# ─────────────────────────────────────────────────────────────────
+# FINANCIAL MATH
+# ─────────────────────────────────────────────────────────────────
+FREQ_MULT = {"Weekly": 4.333, "Bi-Weekly": 2.167, "Monthly": 1.0, "Annual": 1/12}
 
+DEBT_CFG = {
+    "Credit Card":   {"term": 0,   "min_pct": 0.02,  "hint": "2% of balance (standard bank rule)"},
+    "Car Loan":      {"term": 60,  "min_pct": 0,     "hint": "Amortized over 60-month term"},
+    "Mortgage":      {"term": 360, "min_pct": 0,     "hint": "Amortized over 30-year term"},
+    "Student Loan":  {"term": 120, "min_pct": 0,     "hint": "Amortized over 10-year term"},
+    "Personal Loan": {"term": 48,  "min_pct": 0,     "hint": "Amortized over 4-year term"},
+    "Medical Debt":  {"term": 0,   "min_pct": 0.02,  "hint": "2% of balance"},
+    "Other":         {"term": 60,  "min_pct": 0,     "hint": "Amortized over 5-year term"},
+}
 
-# ─────────────────────────────────────────────
-# HELPER FUNCTIONS
-# ─────────────────────────────────────────────
-FREQ_TO_MONTHLY = {"Weekly": 4.33, "Bi-Weekly": 2.17, "Monthly": 1.0, "Annual": 1/12}
-
-def monthly_income():
-    return st.session_state.income * FREQ_TO_MONTHLY[st.session_state.income_freq]
-
-def months_to_payoff(balance, rate_annual, monthly_payment):
-    """Returns months to pay off, total paid, total interest."""
-    if monthly_payment <= 0 or balance <= 0:
-        return None, None, None
-    r = rate_annual / 100 / 12
+def amortized_payment(balance, annual_rate, months):
+    if months <= 0 or balance <= 0:
+        return 0.0
+    r = annual_rate / 100 / 12
     if r == 0:
-        months = math.ceil(balance / monthly_payment)
-        return months, months * monthly_payment, 0.0
-    if monthly_payment <= balance * r:
-        return None, None, None  # payment too low
-    months = -math.log(1 - (balance * r) / monthly_payment) / math.log(1 + r)
-    months = math.ceil(months)
-    total_paid = monthly_payment * months
-    return months, total_paid, total_paid - balance
+        return balance / months
+    return balance * r * (1 + r)**months / ((1 + r)**months - 1)
 
-def simulate_payoff(debts, extra_monthly, strategy):
-    """
-    Simulate month-by-month payoff using chosen strategy.
-    Returns: list of dicts with month, remaining balances, total paid, interest paid.
-    """
+def calc_min(debt):
+    cfg = DEBT_CFG.get(debt["type"], DEBT_CFG["Other"])
+    if cfg["min_pct"] > 0:
+        return max(25.0, debt["balance"] * cfg["min_pct"])
+    term = debt.get("term_months") or cfg["term"]
+    return amortized_payment(debt["balance"], debt["rate"], term)
+
+def gross_monthly(incomes, month=0, future_incomes=None):
+    base = sum(i["amount"] * FREQ_MULT[i["freq"]] for i in incomes)
+    extra = 0.0
+    if future_incomes:
+        for fi in future_incomes:
+            if month >= fi["start_month"]:
+                extra += fi["amount"] * FREQ_MULT[fi["freq"]]
+    return base + extra
+
+def simulate(debts, incomes, future_incomes, extra_pct, strategy, max_months=600):
     if not debts:
         return [], []
-
-    # Sort order
-    if strategy == "Avalanche (Highest Interest First)":
-        order = sorted(range(len(debts)), key=lambda i: -debts[i]["rate"])
-    else:  # Snowball
-        order = sorted(range(len(debts)), key=lambda i: debts[i]["balance"])
-
     balances = [d["balance"] for d in debts]
-    rates = [d["rate"] / 100 / 12 for d in debts]
-    min_payments = [d["min_payment"] for d in debts]
+    rates    = [d["rate"] / 100 / 12 for d in debts]
+    mins     = [calc_min(d) for d in debts]
+
+    order = sorted(range(len(debts)), key=lambda i: -debts[i]["rate"] if strategy=="Avalanche" else balances[i])
 
     timeline = []
     total_interest = 0.0
-    month = 0
-    MAX_MONTHS = 600
+    payoff_events = {i: None for i in range(len(debts))}
 
-    while any(b > 0.01 for b in balances) and month < MAX_MONTHS:
-        month += 1
-        available = extra_monthly + sum(min_payments[i] for i in range(len(debts)) if balances[i] > 0.01)
+    for month in range(1, max_months + 1):
+        active = [i for i in range(len(debts)) if balances[i] > 0.01]
+        if not active:
+            break
 
-        # Apply interest & min payments
-        interest_this_month = 0
-        for i in range(len(debts)):
-            if balances[i] > 0.01:
-                interest = balances[i] * rates[i]
-                interest_this_month += interest
-                balances[i] += interest
-                pay = min(min_payments[i], balances[i])
-                balances[i] -= pay
-                available -= pay
+        gm = gross_monthly(incomes, month, future_incomes)
+        takehome = gm * 0.75
 
-        total_interest += interest_this_month
+        # Update revolving minimums
+        for i in active:
+            if DEBT_CFG.get(debts[i]["type"], {}).get("min_pct", 0) > 0:
+                mins[i] = max(25.0, balances[i] * DEBT_CFG[debts[i]["type"]]["min_pct"])
 
-        # Apply extra to target debt
-        available = max(0, available)
+        total_min_active = sum(mins[i] for i in active)
+        extra_budget = max(0.0, takehome * extra_pct)
+
+        # Apply interest
+        mi = 0.0
+        for i in active:
+            interest = balances[i] * rates[i]
+            balances[i] += interest
+            mi += interest
+        total_interest += mi
+
+        # Pay minimums
+        available = total_min_active + extra_budget
+        for i in active:
+            pay = min(mins[i], balances[i], available)
+            balances[i] -= pay
+            available -= pay
+
+        # Apply extra to target
+        available = max(0.0, available)
         for i in order:
             if balances[i] > 0.01 and available > 0:
                 pay = min(available, balances[i])
                 balances[i] -= pay
                 available -= pay
 
-        # Clamp
         balances = [max(0.0, b) for b in balances]
+
+        for i in range(len(debts)):
+            if payoff_events[i] is None and balances[i] < 0.01:
+                payoff_events[i] = month
 
         timeline.append({
             "month": month,
             "balances": balances.copy(),
             "total_remaining": sum(balances),
-            "total_interest_paid": total_interest,
+            "total_interest": total_interest,
+            "takehome": takehome,
         })
 
     events = []
     for i, d in enumerate(debts):
-        for t in timeline:
-            if t["balances"][i] < 0.01:
-                events.append({
-                    "debt": d["name"],
-                    "payoff_month": t["month"],
-                    "payoff_date": (date.today() + timedelta(days=t["month"] * 30.4)).strftime("%b %Y"),
-                })
-                break
-
+        m = payoff_events.get(i)
+        if m:
+            events.append({
+                "name": d["name"],
+                "month": m,
+                "date": (date.today() + timedelta(days=m * 30.44)).strftime("%b %Y"),
+                "freed_min": calc_min(d),
+            })
+    events.sort(key=lambda x: x["month"])
     return timeline, events
 
-
-def debt_freedom_score(debts, income_m):
-    """0-100 score based on DTI and interest load."""
-    if not debts or income_m == 0:
+def freedom_score(debts, monthly_gross):
+    if not debts or monthly_gross == 0:
         return 100
-    total_min = sum(d["min_payment"] for d in debts)
-    total_balance = sum(d["balance"] for d in debts)
-    dti = total_min / income_m
-    avg_rate = sum(d["rate"] * d["balance"] for d in debts) / max(total_balance, 1)
-    score = 100 - (dti * 150) - (avg_rate * 2)
+    th = monthly_gross * 0.75
+    total_min = sum(calc_min(d) for d in debts)
+    total_bal = sum(d["balance"] for d in debts)
+    dti = total_min / th
+    avg_rate = sum(d["rate"] * d["balance"] for d in debts) / max(total_bal, 1)
+    score = 100 - (dti * 120) - (avg_rate * 1.8)
     return max(0, min(100, round(score)))
 
-def advisor_insights(debts, income_m, extra, strategy):
-    insights = []
-    if not debts:
-        return ["Add your debts to get personalized advice."]
-
-    total_balance = sum(d["balance"] for d in debts)
-    total_min = sum(d["min_payment"] for d in debts)
-    dti = total_min / income_m if income_m > 0 else 0
-    high_rate = [d for d in debts if d["rate"] >= 20]
-    cc_debts = [d for d in debts if d["type"] == "Credit Card"]
-    available_after = income_m - total_min - extra
-
-    # DTI advice
-    if dti > 0.43:
-        insights.append(f"🚨 **Danger Zone:** Your debt-to-income ratio is **{dti:.0%}** — above the 43% mortgage qualification threshold. Lenders see you as high-risk. Priority #1: reduce minimum payments by paying off smaller debts fast.")
-    elif dti > 0.20:
-        insights.append(f"⚠️ **Watch Your DTI:** At **{dti:.0%}**, you're carrying a moderate debt load. Keep it below 20% for financial flexibility.")
-    else:
-        insights.append(f"✅ **Healthy DTI:** Your debt-to-income ratio of **{dti:.0%}** is manageable. You have room to aggressively pay down debt.")
-
-    # High interest
-    if high_rate:
-        names = ", ".join(d["name"] for d in high_rate)
-        insights.append(f"🔥 **High-Rate Alert:** {names} {'are' if len(high_rate)>1 else 'is'} charging 20%+ APR. This is the most expensive money you owe — every dollar here costs you 20+ cents per year. Eliminate these first.")
-
-    # Extra payment impact
-    if extra > 0:
-        insights.append(f"💪 **Extra Payment Power:** Your ${extra:,.0f}/mo extra payment is your fastest wealth-building tool. Even small increases dramatically shrink your timeline.")
-    else:
-        if available_after > 100:
-            insights.append(f"💡 **Untapped Potential:** You have ~${available_after:,.0f}/mo of breathing room after minimums. Putting even **${min(200, available_after*0.5):,.0f}** extra toward debt could save thousands in interest.")
-
-    # Strategy
-    if strategy == "Avalanche (Highest Interest First)":
-        insights.append("📊 **Avalanche Strategy:** Mathematically optimal — you'll pay the least total interest. Best if you're motivated by numbers and saving money.")
-    else:
-        insights.append("⛄ **Snowball Strategy:** Behaviorally powerful — quick wins on small balances build momentum. Research shows this works better for people who struggle with motivation.")
-
-    # W-2 specific
-    insights.append("📋 **W-2 Tax Tip:** As a W-2 employee, mortgage interest is tax-deductible (if you itemize). This effectively lowers your mortgage rate — factor this in before paying extra on your mortgage vs. credit cards.")
-
-    return insights
-
-
-# ─────────────────────────────────────────────
-# SIDEBAR — INCOME & ADD DEBTS
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 💰 Income Setup")
-    st.session_state.income = st.number_input(
-        "Gross Income", min_value=0.0, value=st.session_state.income,
-        step=100.0, format="%.2f", help="Your before-tax income per pay period"
-    )
-    st.session_state.income_freq = st.selectbox(
-        "Pay Frequency", ["Weekly", "Bi-Weekly", "Monthly", "Annual"],
-        index=["Weekly", "Bi-Weekly", "Monthly", "Annual"].index(st.session_state.income_freq)
-    )
+    st.markdown("## 💰 Income Sources")
+    st.caption("Add all W-2 income streams.")
 
-    # Estimate take-home (rough 25% tax for W-2)
-    gross_m = monthly_income()
-    est_takehome = gross_m * 0.75
-    st.markdown(f"""
-    <div style='background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.8rem 1rem;margin-top:0.5rem;'>
-    <div style='font-size:0.72rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.08em;'>Est. Monthly Take-Home</div>
-    <div style='font-size:1.3rem;font-weight:700;color:#3fb950;font-family:JetBrains Mono,monospace;'>${est_takehome:,.0f}</div>
-    <div style='font-size:0.7rem;color:#6e7681;'>After ~25% W-2 taxes</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("### ➕ Add a Debt")
-
-    with st.form("add_debt_form", clear_on_submit=True):
-        d_type = st.selectbox("Debt Type", ["Credit Card", "Car Loan", "Mortgage", "Student Loan", "Personal Loan", "Other"])
-        d_name = st.text_input("Label / Name", placeholder="e.g. Chase Sapphire, Honda Civic")
-        d_balance = st.number_input("Current Balance ($)", min_value=0.0, step=100.0, format="%.2f")
-        d_rate = st.number_input("Interest Rate (APR %)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f")
-        d_min = st.number_input("Minimum Monthly Payment ($)", min_value=0.0, step=10.0, format="%.2f")
-
-        submitted = st.form_submit_button("Add Debt ➕")
-        if submitted:
-            if d_balance > 0 and d_name:
-                st.session_state.debts.append({
-                    "name": d_name if d_name else d_type,
-                    "type": d_type,
-                    "balance": d_balance,
-                    "rate": d_rate,
-                    "min_payment": d_min,
-                })
-                st.success(f"Added: {d_name}")
+    with st.form("income_form", clear_on_submit=True):
+        i_label  = st.text_input("Label", placeholder="Main Job, Side Gig…")
+        i_amount = st.number_input("Gross Amount ($)", min_value=0.0, step=100.0, format="%.2f")
+        i_freq   = st.selectbox("Frequency", ["Weekly","Bi-Weekly","Monthly","Annual"])
+        if st.form_submit_button("➕ Add Income"):
+            if i_amount > 0:
+                st.session_state.incomes.append({"label": i_label or "Income", "amount": i_amount, "freq": i_freq})
+                st.rerun()
             else:
-                st.error("Please enter a name and balance > 0.")
+                st.error("Amount must be > 0")
+
+    for idx, inc in enumerate(st.session_state.incomes):
+        c1, c2 = st.columns([5, 1])
+        c1.markdown(f"**{inc['label']}** — ${inc['amount']:,.0f} / {inc['freq']}")
+        if c2.button("✕", key=f"di_{idx}"):
+            st.session_state.incomes.pop(idx); st.rerun()
 
     st.markdown("---")
-    st.markdown("### ⚙️ Payoff Settings")
-    st.session_state.extra_payment = st.number_input(
-        "Extra Monthly Payment ($)", min_value=0.0,
-        value=st.session_state.extra_payment, step=50.0, format="%.2f",
-        help="Amount you can put toward debt above minimums each month"
-    )
+    st.markdown("## 📈 Expected Future Income")
+    st.caption("Raise, bonus, new job? Add it so your timeline is realistic.")
+
+    with st.form("fi_form", clear_on_submit=True):
+        fi_label   = st.text_input("Label", placeholder="Annual Raise, Year-End Bonus…")
+        fi_amount  = st.number_input("Additional Gross ($)", min_value=0.0, step=100.0, format="%.2f")
+        fi_freq    = st.selectbox("Frequency", ["Weekly","Bi-Weekly","Monthly","Annual"], key="fif")
+        fi_months  = st.number_input("Starts in (months)", min_value=1, max_value=120, value=6, step=1)
+        if st.form_submit_button("➕ Add Future Income"):
+            if fi_amount > 0:
+                st.session_state.future_income.append({
+                    "label": fi_label or "Raise", "amount": fi_amount,
+                    "freq": fi_freq, "start_month": int(fi_months),
+                })
+                st.rerun()
+
+    for idx, fi in enumerate(st.session_state.future_income):
+        c1, c2 = st.columns([5,1])
+        c1.markdown(f"**{fi['label']}** +${fi['amount']:,.0f}/{fi['freq']} in {fi['start_month']} mo")
+        if c2.button("✕", key=f"dfi_{idx}"):
+            st.session_state.future_income.pop(idx); st.rerun()
+
+    st.markdown("---")
+    st.markdown("## 🏦 Add Debt")
+    st.caption("Just enter balance, type, and APR. We calculate the minimum.")
+
+    with st.form("debt_form", clear_on_submit=True):
+        d_type    = st.selectbox("Debt Type", list(DEBT_CFG.keys()))
+        d_name    = st.text_input("Name / Label", placeholder="Chase Sapphire, Toyota Camry…")
+        d_balance = st.number_input("Current Balance ($)", min_value=0.0, step=100.0, format="%.2f")
+        d_rate    = st.number_input("Interest Rate (APR %)", min_value=0.0, max_value=35.0, value=18.0, step=0.25, format="%.2f")
+        d_term    = None
+        if d_type not in ["Credit Card", "Medical Debt"]:
+            default_term = DEBT_CFG[d_type]["term"]
+            d_term = st.number_input(f"Remaining Term (months)", min_value=1, max_value=480, value=default_term, step=12)
+        st.caption(f"ℹ️ {DEBT_CFG[d_type]['hint']}")
+        if st.form_submit_button("➕ Add Debt"):
+            if d_balance > 0:
+                entry = {"name": d_name or d_type, "type": d_type, "balance": d_balance, "rate": d_rate, "term_months": d_term}
+                min_p = calc_min(entry)
+                st.session_state.debts.append(entry)
+                st.success(f"Added! Auto min payment: ${min_p:,.0f}/mo")
+                st.rerun()
+            else:
+                st.error("Balance must be > 0")
+
+    st.markdown("---")
+    st.markdown("## ⚙️ Strategy")
     st.session_state.strategy = st.radio(
-        "Payoff Strategy",
-        ["Avalanche (Highest Interest First)", "Snowball (Lowest Balance First)"],
-        index=0 if st.session_state.strategy.startswith("Ava") else 1
+        "Payoff Method", ["Avalanche", "Snowball"],
+        captions=["Highest APR first — saves most money", "Lowest balance first — quick wins"]
     )
 
-
-# ─────────────────────────────────────────────
-# MAIN CONTENT
-# ─────────────────────────────────────────────
-st.markdown("""
-<div class='hero-header'>
-  <div class='hero-title'>💳 <span class='accent'>DebtFree</span> Advisor</div>
-  <div class='hero-subtitle'>Smart debt payoff platform for W-2 employees — your personal financial advisor</div>
-</div>
-""", unsafe_allow_html=True)
-
-debts = st.session_state.debts
-income_m = monthly_income()
-extra = st.session_state.extra_payment
+# ─────────────────────────────────────────────────────────────────
+# COMPUTED VALUES
+# ─────────────────────────────────────────────────────────────────
+debts   = st.session_state.debts
+incomes = st.session_state.incomes
+future  = st.session_state.future_income
 strategy = st.session_state.strategy
 
-# ── SUMMARY METRICS ─────────────────────────
-total_balance = sum(d["balance"] for d in debts)
-total_min = sum(d["min_payment"] for d in debts)
-avg_rate = (sum(d["rate"] * d["balance"] for d in debts) / total_balance) if total_balance > 0 else 0
-score = debt_freedom_score(debts, income_m)
-dti = total_min / income_m if income_m > 0 else 0
+gross_m    = gross_monthly(incomes)
+takehome_m = gross_m * 0.75
+total_bal  = sum(d["balance"] for d in debts)
+total_min  = sum(calc_min(d) for d in debts)
+avg_rate   = (sum(d["rate"]*d["balance"] for d in debts) / total_bal) if total_bal > 0 else 0
+dti        = total_min / takehome_m if takehome_m > 0 else 0
+score      = freedom_score(debts, gross_m)
+disposable = max(0, takehome_m - total_min)
 
-score_color = "green" if score >= 70 else ("yellow" if score >= 40 else "red")
-dti_color = "green" if dti < 0.20 else ("yellow" if dti < 0.36 else "red")
-
-st.markdown(f"""
-<div class='metric-row'>
-  <div class='metric-card'>
-    <div class='metric-label'>Total Debt</div>
-    <div class='metric-value red'>${total_balance:,.0f}</div>
-    <div class='metric-delta'>{len(debts)} account(s)</div>
-  </div>
-  <div class='metric-card'>
-    <div class='metric-label'>Monthly Income</div>
-    <div class='metric-value green'>${income_m:,.0f}</div>
-    <div class='metric-delta'>{st.session_state.income_freq} → Monthly</div>
-  </div>
-  <div class='metric-card'>
-    <div class='metric-label'>Total Min. Payments</div>
-    <div class='metric-value yellow'>${total_min:,.0f}/mo</div>
-    <div class='metric-delta'>{dti:.0%} of income</div>
-  </div>
-  <div class='metric-card'>
-    <div class='metric-label'>Avg Interest Rate</div>
-    <div class='metric-value {"red" if avg_rate > 15 else "yellow"}'>{avg_rate:.1f}%</div>
-    <div class='metric-delta'>Weighted by balance</div>
-  </div>
-  <div class='metric-card'>
-    <div class='metric-label'>Freedom Score™</div>
-    <div class='metric-value {score_color}'>{score}/100</div>
-    <div class='metric-delta'>{"Excellent" if score>=80 else "Good" if score>=60 else "Fair" if score>=40 else "At Risk"}</div>
-  </div>
-  <div class='metric-card'>
-    <div class='metric-label'>Extra Payment</div>
-    <div class='metric-value blue'>${extra:,.0f}/mo</div>
-    <div class='metric-delta'>Above minimums</div>
-  </div>
+# ─────────────────────────────────────────────────────────────────
+# HEADER
+# ─────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class='hero'>
+  <h1>💳 <span class='accent'>DebtFree</span> Advisor</h1>
+  <p>Smart W-2 debt payoff platform — just enter your numbers, we handle all the financial math</p>
 </div>
 """, unsafe_allow_html=True)
 
-# ── DEBT LIST ────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
+# KPI ROW
+# ─────────────────────────────────────────────────────────────────
+sc = "green" if score>=70 else ("yellow" if score>=40 else "red")
+dc = "green" if dti<.20 else ("yellow" if dti<.36 else "red")
+
+st.markdown(f"""
+<div class='kpi-row'>
+  <div class='kpi'><div class='kpi-label'>Monthly Take-Home</div>
+    <div class='kpi-val green'>${takehome_m:,.0f}</div><div class='kpi-sub'>After ~25% W-2 taxes</div></div>
+  <div class='kpi'><div class='kpi-label'>Total Debt</div>
+    <div class='kpi-val red'>${total_bal:,.0f}</div><div class='kpi-sub'>{len(debts)} account(s)</div></div>
+  <div class='kpi'><div class='kpi-label'>Auto Min Payments</div>
+    <div class='kpi-val yellow'>${total_min:,.0f}/mo</div><div class='kpi-sub'>Calculated for you</div></div>
+  <div class='kpi'><div class='kpi-label'>Debt-to-Income</div>
+    <div class='kpi-val {dc}'>{dti:.0%}</div>
+    <div class='kpi-sub'>{"✅ Healthy" if dti<.20 else "⚠️ Elevated" if dti<.36 else "🚨 High Risk"}</div></div>
+  <div class='kpi'><div class='kpi-label'>Avg Interest Rate</div>
+    <div class='kpi-val {"red" if avg_rate>15 else "yellow" if avg_rate>8 else "green"}'>{avg_rate:.1f}%</div>
+    <div class='kpi-sub'>Weighted by balance</div></div>
+  <div class='kpi'><div class='kpi-label'>Freedom Score™</div>
+    <div class='kpi-val {sc}'>{score}/100</div>
+    <div class='kpi-sub'>{"Excellent" if score>=80 else "Good" if score>=60 else "Fair" if score>=40 else "At Risk"}</div></div>
+  <div class='kpi'><div class='kpi-label'>Free Cash / mo</div>
+    <div class='kpi-val teal'>${disposable:,.0f}</div><div class='kpi-sub'>After all minimums</div></div>
+</div>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────
+# DEBT TABLE
+# ─────────────────────────────────────────────────────────────────
 if debts:
-    st.markdown("<div class='section-header'>📋 Your Debts</div>", unsafe_allow_html=True)
-    
-    to_delete = None
+    st.markdown("<div class='sec-header'>📋 Your Debts — Auto-Calculated Payments</div>", unsafe_allow_html=True)
+    ICONS = {"Credit Card":"💳","Car Loan":"🚗","Mortgage":"🏠","Student Loan":"🎓","Personal Loan":"🤝","Medical Debt":"🏥","Other":"📄"}
+    rows = []
+    for d in debts:
+        min_p = calc_min(d)
+        monthly_int = d["balance"] * d["rate"] / 100 / 12
+        rows.append({
+            "": ICONS.get(d["type"],"📄"),
+            "Name": d["name"],
+            "Type": d["type"],
+            "Balance": f"${d['balance']:,.0f}",
+            "APR": f"{d['rate']}%",
+            "Auto Min/mo": f"${min_p:,.0f}",
+            "Interest/mo": f"${monthly_int:,.0f}",
+            "Principal/mo": f"${max(0,min_p-monthly_int):,.0f}",
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    to_del = None
+    cols = st.columns(min(len(debts), 5))
     for i, d in enumerate(debts):
-        col1, col2, col3, col4, col5, col6 = st.columns([2.5, 1.5, 1.3, 1.3, 1.3, 0.7])
-        type_icons = {"Credit Card": "💳", "Car Loan": "🚗", "Mortgage": "🏠",
-                      "Student Loan": "🎓", "Personal Loan": "🤝", "Other": "📄"}
-        icon = type_icons.get(d["type"], "📄")
-        m, total_p, int_p = months_to_payoff(d["balance"], d["rate"], d["min_payment"])
-        
-        with col1:
-            st.markdown(f"**{icon} {d['name']}**  \n<span style='font-size:0.78rem;color:#8b949e;'>{d['type']}</span>", unsafe_allow_html=True)
-        with col2:
-            st.metric("Balance", f"${d['balance']:,.0f}", label_visibility="collapsed")
-            st.caption(f"${d['balance']:,.0f} balance")
-        with col3:
-            st.caption(f"APR: **{d['rate']}%**")
-        with col4:
-            st.caption(f"Min: **${d['min_payment']:,.0f}/mo**")
-        with col5:
-            if m:
-                st.caption(f"Min-only payoff: **{m} mo**")
-            else:
-                st.caption("⚠️ Min too low!")
-        with col6:
-            if st.button("🗑️", key=f"del_{i}", help="Remove this debt"):
-                to_delete = i
+        with cols[i % 5]:
+            if st.button(f"Remove {d['name']}", key=f"deld_{i}"):
+                to_del = i
+    if to_del is not None:
+        st.session_state.debts.pop(to_del); st.rerun()
 
-    if to_delete is not None:
-        st.session_state.debts.pop(to_delete)
-        st.rerun()
+# ─────────────────────────────────────────────────────────────────
+# SCENARIOS
+# ─────────────────────────────────────────────────────────────────
+if debts and incomes:
+    st.markdown("<div class='sec-header'>🎯 Smart Payoff Scenarios — Your Three Paths</div>", unsafe_allow_html=True)
+    st.caption("The advisor automatically calculates all three scenarios from your income. No manual inputs needed.")
 
-# ── SIMULATION & CHARTS ──────────────────────
-if debts:
-    st.markdown("<div class='section-header'>📈 Payoff Simulation</div>", unsafe_allow_html=True)
+    SCENARIOS = [
+        {"label": "📉 Minimum Only",          "pct": 0.0,  "color": "#f85149", "desc": "Pay only the required minimums. Worst case — shows you what inaction costs."},
+        {"label": "⚖️ Balanced (Recommended)", "pct": 0.20, "color": "#e3b341", "desc": "20% of take-home above minimums. Strong progress without straining your lifestyle."},
+        {"label": "🚀 Aggressive",             "pct": 0.35, "color": "#3fb950", "desc": "35% of take-home above minimums. Maximum speed to debt freedom."},
+    ]
 
-    total_monthly = total_min + extra
-    timeline, events = simulate_payoff(debts, extra, strategy)
+    fig = go.Figure()
+    results = []
 
-    if timeline:
-        months_total = timeline[-1]["month"]
-        total_interest = timeline[-1]["total_interest_paid"]
-        payoff_date = (date.today() + timedelta(days=months_total * 30.4)).strftime("%B %Y")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("🗓️ Debt-Free Date", payoff_date, f"{months_total} months ({months_total/12:.1f} yrs)")
-        with col2:
-            st.metric("💸 Total Interest Paid", f"${total_interest:,.0f}")
-        with col3:
-            st.metric("💰 Total Amount Paid", f"${total_balance + total_interest:,.0f}")
-
-        # ── PAYOFF CURVE CHART ──
-        months_list = [t["month"] for t in timeline]
-        remaining_list = [t["total_remaining"] for t in timeline]
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=months_list, y=remaining_list,
-            fill='tozeroy',
-            line=dict(color='#00d4aa', width=2.5),
-            fillcolor='rgba(0,212,170,0.08)',
-            name='Total Remaining',
-            hovertemplate='Month %{x}: $%{y:,.0f} remaining<extra></extra>'
-        ))
-
-        # Per-debt lines
-        colors = ["#58a6ff", "#f85149", "#e3b341", "#a371f7", "#3fb950", "#ffa657"]
-        for idx, d in enumerate(debts):
-            per_debt = [t["balances"][idx] for t in timeline]
+    for sc in SCENARIOS:
+        tl, events = simulate(debts, incomes, future, sc["pct"], strategy)
+        if tl:
+            extra_mo = takehome_m * sc["pct"]
             fig.add_trace(go.Scatter(
-                x=months_list, y=per_debt,
-                line=dict(color=colors[idx % len(colors)], width=1.5, dash='dot'),
+                x=[t["month"] for t in tl],
+                y=[t["total_remaining"] for t in tl],
+                name=sc["label"],
+                line=dict(color=sc["color"], width=2.5),
+                hovertemplate=f'<b>{sc["label"]}</b><br>Month %{{x}}: $%{{y:,.0f}} left<extra></extra>'
+            ))
+            results.append({"sc": sc, "tl": tl, "events": events,
+                             "months": tl[-1]["month"], "interest": tl[-1]["total_interest"],
+                             "extra_mo": extra_mo})
+
+    # Future income markers
+    for fi in future:
+        fig.add_vline(x=fi["start_month"], line_dash="dot", line_color="#58a6ff",
+            annotation_text=f"📈 {fi['label']}", annotation_font_color="#58a6ff",
+            annotation_position="top left")
+
+    fig.update_layout(
+        paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+        font=dict(color="#8b949e", family="Sora"),
+        xaxis=dict(title="Month", gridcolor="#21262d", color="#8b949e", zerolinecolor="#21262d"),
+        yaxis=dict(title="Total Debt Remaining ($)", gridcolor="#21262d", color="#8b949e", tickprefix="$", zerolinecolor="#21262d"),
+        legend=dict(bgcolor="#161b22", bordercolor="#30363d", borderwidth=1),
+        title=dict(text="📉 Three Scenarios — Choose Your Path to Debt Freedom", font=dict(color="#e6edf3", size=16)),
+        height=430, margin=dict(l=20, r=20, t=60, b=20)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Scenario summary cards
+    cols = st.columns(len(results))
+    for col, res in zip(cols, results):
+        sc = res["sc"]
+        payoff_date = (date.today() + timedelta(days=res["months"]*30.44)).strftime("%b %Y")
+        with col:
+            st.markdown(f"""
+            <div class='scenario-card'>
+              <div style='font-weight:600;font-size:1rem;color:{sc["color"]};margin-bottom:.5rem;'>{sc["label"]}</div>
+              <div style='font-size:1.4rem;font-weight:700;font-family:JetBrains Mono,monospace;color:{sc["color"]};'>{payoff_date}</div>
+              <div style='font-size:.82rem;color:#8b949e;margin-top:.5rem;line-height:1.6;'>
+                <b style='color:#e6edf3;'>{res["months"]} months</b> ({res["months"]/12:.1f} yrs)<br>
+                Interest paid: <b style='color:#f85149;'>${res["interest"]:,.0f}</b><br>
+                Extra/mo: <b style='color:#3fb950;'>${res["extra_mo"]:,.0f}</b><br>
+                <span style='color:#6e7681;font-size:.74rem;'>{sc["desc"]}</span>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Intelligence summary
+    if len(results) >= 2:
+        saved_int   = results[0]["interest"] - results[-1]["interest"]
+        saved_months = results[0]["months"] - results[-1]["months"]
+        st.markdown(f"""
+        <div class='advisor'>
+          <div class='advisor-title'>🧠 What the Numbers Tell You</div>
+          <div class='advisor-body'>
+            Going from <b>Minimum Only → Aggressive</b> saves you
+            <b style='color:#3fb950;'>${saved_int:,.0f} in total interest</b> and
+            <b style='color:#3fb950;'>{saved_months} months ({saved_months/12:.1f} years)</b> of your life.
+            The extra ${results[-1]["extra_mo"]:,.0f}/mo you'd put toward debt is the single highest-return
+            move you can make — a guaranteed <b>{avg_rate:.1f}% return</b> (your average APR) with zero market risk.
+            No stock or investment reliably beats paying off {avg_rate:.1f}% debt.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── MILESTONES ──────────────────────────────────────────────
+    if len(results) >= 2:
+        st.markdown("<div class='sec-header'>🏁 Payoff Milestones — Balanced Scenario</div>", unsafe_allow_html=True)
+        for ev in results[1]["events"]:
+            st.markdown(f"""
+            <div style='background:#161b22;border:1px solid #30363d;border-radius:10px;
+                        padding:.85rem 1.3rem;margin-bottom:.5rem;
+                        display:flex;justify-content:space-between;align-items:center;'>
+              <div>
+                <b style='color:#e6edf3;'>{ev["name"]}</b>
+                <span style='color:#8b949e;font-size:.8rem;'> — paid off month {ev["month"]}</span>
+              </div>
+              <div style='text-align:right;'>
+                <div style='color:#00d4aa;font-weight:700;'>{ev["date"]}</div>
+                <div style='color:#3fb950;font-size:.78rem;'>+${ev["freed_min"]:,.0f}/mo freed up 🎉</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── PER-DEBT CHART ──────────────────────────────────────────
+    if len(results) >= 2:
+        st.markdown("<div class='sec-header'>📊 Individual Debt Balances — Balanced Scenario</div>", unsafe_allow_html=True)
+        tl = results[1]["tl"]
+        COLORS = ["#58a6ff","#f85149","#e3b341","#a371f7","#3fb950","#ffa657","#00d4aa","#ec6547"]
+        fig2 = go.Figure()
+        for idx, d in enumerate(debts):
+            fig2.add_trace(go.Scatter(
+                x=[t["month"] for t in tl],
+                y=[t["balances"][idx] for t in tl],
                 name=d["name"],
+                line=dict(color=COLORS[idx % len(COLORS)], width=2),
                 hovertemplate=f'{d["name"]} Month %{{x}}: $%{{y:,.0f}}<extra></extra>'
             ))
-
-        fig.update_layout(
-            paper_bgcolor='#0d1117', plot_bgcolor='#0d1117',
-            font=dict(color='#8b949e', family='Sora'),
-            xaxis=dict(title='Month', gridcolor='#21262d', color='#8b949e', zerolinecolor='#21262d'),
-            yaxis=dict(title='Balance ($)', gridcolor='#21262d', color='#8b949e', tickprefix='$', zerolinecolor='#21262d'),
-            legend=dict(bgcolor='#161b22', bordercolor='#30363d', borderwidth=1),
-            title=dict(text='📉 Debt Payoff Timeline', font=dict(color='#e6edf3', size=16)),
-            height=380,
-            margin=dict(l=20, r=20, t=60, b=20)
+        fig2.update_layout(
+            paper_bgcolor="#0d1117", plot_bgcolor="#0d1117",
+            font=dict(color="#8b949e", family="Sora"),
+            xaxis=dict(title="Month", gridcolor="#21262d", color="#8b949e"),
+            yaxis=dict(title="Balance ($)", gridcolor="#21262d", color="#8b949e", tickprefix="$"),
+            legend=dict(bgcolor="#161b22", bordercolor="#30363d", borderwidth=1),
+            title=dict(text="Each Debt's Balance Over Time", font=dict(color="#e6edf3", size=15)),
+            height=340, margin=dict(l=20, r=20, t=50, b=20)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True)
 
-        # ── PAYOFF EVENTS ──
-        if events:
-            st.markdown("<div class='section-header'>🏁 Debt Payoff Milestones</div>", unsafe_allow_html=True)
-            ev_df = pd.DataFrame(events)
-            ev_df.columns = ["Debt", "Month #", "Payoff Date"]
-            st.dataframe(ev_df, use_container_width=True, hide_index=True)
+    # ── ADVISOR INSIGHTS ────────────────────────────────────────
+    st.markdown("<div class='sec-header'>🧠 Personalized Financial Advice</div>", unsafe_allow_html=True)
 
-        # ── STRATEGY COMPARISON ──
-        st.markdown("<div class='section-header'>⚖️ Strategy Comparison</div>", unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
+    high_rate = [d for d in debts if d["rate"] >= 20]
+    cc_debts  = [d for d in debts if d["type"] == "Credit Card"]
+    mortgage  = [d for d in debts if d["type"] == "Mortgage"]
 
-        with col1:
-            tl_aval, _ = simulate_payoff(debts, extra, "Avalanche (Highest Interest First)")
-            if tl_aval:
-                st.markdown(f"""
-                <div class='metric-card'>
-                <div class='metric-label'>🔺 Avalanche Strategy</div>
-                <div class='metric-value blue'>{tl_aval[-1]['month']} months</div>
-                <div class='metric-delta'>Total interest: ${tl_aval[-1]['total_interest_paid']:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        with col2:
-            tl_snow, _ = simulate_payoff(debts, extra, "Snowball (Lowest Balance First)")
-            if tl_snow:
-                st.markdown(f"""
-                <div class='metric-card'>
-                <div class='metric-label'>⛄ Snowball Strategy</div>
-                <div class='metric-value yellow'>{tl_snow[-1]['month']} months</div>
-                <div class='metric-delta'>Total interest: ${tl_snow[-1]['total_interest_paid']:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        if tl_aval and tl_snow:
-            interest_diff = tl_snow[-1]['total_interest_paid'] - tl_aval[-1]['total_interest_paid']
-            month_diff = tl_snow[-1]['month'] - tl_aval[-1]['month']
-            if interest_diff > 0:
-                st.markdown(f"""
-                <div class='advisor-box'>
-                <div class='advisor-title'>🧠 Comparison Insight</div>
-                <div class='advisor-text'>
-                The <strong>Avalanche method saves you ${interest_diff:,.0f}</strong> in interest 
-                and gets you debt-free <strong>{abs(month_diff)} months sooner</strong> than Snowball. 
-                However, if you have small balances you can wipe out quickly, Snowball can provide 
-                early psychological wins that keep you on track — a motivated payer using Snowball 
-                often beats an unmotivated payer on Avalanche.
-                </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # ── EXTRA PAYMENT SENSITIVITY ──
-        st.markdown("<div class='section-header'>🎚️ What If? — Extra Payment Impact</div>", unsafe_allow_html=True)
-        
-        extras_to_test = [0, 50, 100, 200, 300, 500, 750, 1000]
-        sensitivity = []
-        for ex in extras_to_test:
-            tl, _ = simulate_payoff(debts, ex, strategy)
-            if tl:
-                sensitivity.append({
-                    "Extra/mo": f"${ex:,}",
-                    "Months": tl[-1]["month"],
-                    "Years": round(tl[-1]["month"]/12, 1),
-                    "Total Interest": f"${tl[-1]['total_interest_paid']:,.0f}",
-                    "Interest Saved vs $0": f"${max(0, (tl[0]['total_interest_paid'] if len(tl)>0 else 0)):,.0f}"
-                })
-        
-        if sensitivity:
-            base_interest = None
-            rows = []
-            tl0, _ = simulate_payoff(debts, 0, strategy)
-            base_interest = tl0[-1]['total_interest_paid'] if tl0 else 0
-            
-            sens_extras = []
-            sens_months = []
-            sens_interest = []
-            for ex in extras_to_test:
-                tl, _ = simulate_payoff(debts, ex, strategy)
-                if tl:
-                    sens_extras.append(ex)
-                    sens_months.append(tl[-1]["month"])
-                    sens_interest.append(tl[-1]["total_interest_paid"])
-
-            fig2 = go.Figure()
-            fig2.add_trace(go.Bar(
-                x=[f"${e:,}" for e in sens_extras],
-                y=sens_months,
-                marker_color=['#f85149' if m == max(sens_months) else '#00d4aa' if m == min(sens_months) else '#58a6ff' for m in sens_months],
-                name='Months to Payoff',
-                hovertemplate='Extra $%{x}/mo → %{y} months<extra></extra>'
-            ))
-            fig2.update_layout(
-                paper_bgcolor='#0d1117', plot_bgcolor='#0d1117',
-                font=dict(color='#8b949e', family='Sora'),
-                xaxis=dict(title='Extra Monthly Payment', gridcolor='#21262d', color='#8b949e'),
-                yaxis=dict(title='Months to Payoff', gridcolor='#21262d', color='#8b949e'),
-                title=dict(text='Impact of Extra Payments on Payoff Timeline', font=dict(color='#e6edf3', size=15)),
-                height=320,
-                margin=dict(l=20, r=20, t=60, b=20)
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-
+    if dti > 0.43:
+        st.markdown(f"<div class='danger'>🚨 <b>Critical DTI at {dti:.0%}:</b> Minimum payments consume a dangerous share of your take-home. This disqualifies you from most mortgages. You need to eliminate at least one debt immediately to free up cash flow. Follow the Aggressive scenario.</div>", unsafe_allow_html=True)
+    elif dti > 0.28:
+        st.markdown(f"<div class='warn'>⚠️ <b>Elevated DTI at {dti:.0%}:</b> You're in the caution zone. Lenders want to see below 28% for housing costs and 36% total. Avoid new debt and direct every spare dollar to payoff.</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div class='warning-box'>⚠️ One or more minimum payments may be too low to cover interest — the debt would never be paid off. Please increase your minimum payments.</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='advisor'><div class='advisor-title'>✅ Healthy DTI at {dti:.0%}</div><div class='advisor-body'>You're in a manageable position. Your minimum payments don't dominate your budget — which means you have real power to accelerate payoff with extra payments. Use that leverage.</div></div>", unsafe_allow_html=True)
 
-# ── SMART ADVISOR ────────────────────────────
-st.markdown("<div class='section-header'>🧠 Your AI Financial Advisor</div>", unsafe_allow_html=True)
+    if high_rate:
+        names = ", ".join(d["name"] for d in high_rate)
+        annual_cost = sum(d["balance"] * d["rate"] / 100 for d in high_rate)
+        st.markdown(f"""<div class='advisor'><div class='advisor-title'>🔥 High-Rate Debt Alert</div>
+        <div class='advisor-body'><b>{names}</b> {'are' if len(high_rate)>1 else 'is'} costing you
+        <b style='color:#f85149;'>${annual_cost:,.0f}/year</b> in interest alone. This should receive every
+        extra dollar above your other minimums. Avalanche strategy is strongly recommended when high-rate debt exists.</div></div>""", unsafe_allow_html=True)
 
-insights = advisor_insights(debts, income_m, extra, strategy)
-for insight in insights:
-    st.markdown(f"""
-    <div class='advisor-box'>
-    <div class='advisor-text'>{insight}</div>
+    if cc_debts:
+        cc_bal = sum(d["balance"] for d in cc_debts)
+        cc_int = sum(d["balance"] * d["rate"] / 100 for d in cc_debts)
+        st.markdown(f"""<div class='advisor'><div class='advisor-title'>💳 Balance Transfer Opportunity</div>
+        <div class='advisor-body'>Your credit card balances total <b>${cc_bal:,.0f}</b>, costing
+        <b style='color:#f85149;'>${cc_int:,.0f}/year</b> in interest. A <b>0% APR balance transfer card</b>
+        (promo periods: 12–21 months) could eliminate that interest entirely while you pay down the principal.
+        Even with a 3% transfer fee (${cc_bal*0.03:,.0f}), you'd save significantly if you pay aggressively
+        during the promo window.</div></div>""", unsafe_allow_html=True)
+
+    if mortgage:
+        m = mortgage[0]
+        effective_rate = m["rate"] * (1 - 0.22)
+        st.markdown(f"""<div class='advisor'><div class='advisor-title'>🏠 Mortgage Tax Strategy (W-2 Specific)</div>
+        <div class='advisor-body'>As a W-2 employee, mortgage interest may be <b>tax-deductible</b> if you itemize.
+        At a 22% tax bracket, your {m["rate"]:.1f}% mortgage has an effective after-tax rate of ~<b>{effective_rate:.1f}%</b>.
+        This means almost any other debt (credit cards, car loans) should be paid off <i>before</i> making extra mortgage payments.
+        Don't over-pay your cheapest debt while expensive debt remains.</div></div>""", unsafe_allow_html=True)
+
+    if future:
+        total_raise_m = sum(fi["amount"] * FREQ_MULT[fi["freq"]] for fi in future)
+        earliest = min(fi["start_month"] for fi in future)
+        st.markdown(f"""<div class='advisor'><div class='advisor-title'>📈 Your Future Income Is Already Modeled</div>
+        <div class='advisor-body'>Your upcoming income increase of <b style='color:#3fb950;'>${total_raise_m:,.0f}/mo</b>
+        starting in month {earliest} is built into the timeline above (watch for the blue dotted line on the chart).
+        <b>Critical rule:</b> When the raise arrives, resist lifestyle inflation. Route 100% of the increase to debt first.
+        At your average APR of {avg_rate:.1f}%, that ${total_raise_m:,.0f}/mo saves you
+        <b>${total_raise_m * 12 * avg_rate / 100:,.0f}/year</b> in interest.</div></div>""", unsafe_allow_html=True)
+
+    with st.expander("⚡ 10 Proven Ways to Pay Off Debt Faster (W-2 Employee Edition)", expanded=False):
+        st.markdown("""
+**1. 🎯 Use Your Tax Refund as a Lump Sum**
+The average W-2 refund is $3,000+. Direct 100% straight to your highest-rate debt every February/March.
+
+**2. 📅 Switch to Bi-Weekly Payments**
+Pay half your monthly payment every 2 weeks. You'll make 13 full payments/year instead of 12 — one free extra payment annually, zero extra budget required.
+
+**3. 💼 Route 100% of Raises to Debt**
+When you get a raise, you weren't living on that money before. Direct every dollar of the increase to debt until you're free — then lifestyle-inflate responsibly.
+
+**4. 💳 0% Balance Transfer for Credit Cards**
+Move high-rate credit card debt to a 0% promotional card (12–21 months). Even with a 3–5% fee, you'll save thousands if you pay aggressively during the window.
+
+**5. 🏠 Refinance Your Mortgage**
+A 1% rate reduction on a $300k mortgage saves ~$2,400/year. If you haven't refinanced in 2+ years, get a quote — the break-even on closing costs is often under 2 years.
+
+**6. 📊 Adjust Your W-4 Withholding**
+A large tax refund means you gave the IRS an interest-free loan all year. Adjust your W-4 to break even → get that money monthly → apply it to debt immediately.
+
+**7. 🛍️ Sell Idle Assets**
+Old car, equipment, furniture, electronics. Even $500 applied to a 24% credit card saves $120/year in interest — permanently and immediately.
+
+**8. 🎁 Apply All Non-Salary Income to Debt**
+Bonuses, overtime, side gigs, gifts. Treat these as windfalls, not income — 100% goes to debt. You weren't budgeting on it anyway.
+
+**9. 💡 The Snowball Reinvestment Rule**
+When a debt is paid off, take its full payment amount and add it to the next debt. Your payment grows with every win — this is the compounding effect of the debt payoff strategy.
+
+**10. 🏆 Automate Everything**
+Set up automatic extra payments the day after your paycheck hits. Willpower is finite — automation is permanent. What leaves your account automatically never gets spent.
+        """)
+
+# ─────────────────────────────────────────────────────────────────
+# EMPTY STATES
+# ─────────────────────────────────────────────────────────────────
+elif not incomes:
+    st.markdown("""
+    <div style='text-align:center;padding:5rem 2rem;'>
+      <div style='font-size:3.5rem;'>👈</div>
+      <div style='font-size:1.4rem;font-weight:600;color:#e6edf3;margin-top:1rem;'>Start with your income</div>
+      <div style='color:#8b949e;margin-top:.5rem;max-width:460px;margin-left:auto;margin-right:auto;'>
+        Add your W-2 income in the left sidebar. Then add your debts — balance, type, and APR only.
+        The platform handles all the financial math and shows you exactly when you'll be debt-free.
+      </div>
     </div>
     """, unsafe_allow_html=True)
-
-# ── FAST PAYOFF STRATEGIES ───────────────────
-with st.expander("⚡ 10 Ways to Pay Off Debt Faster (W-2 Employee Edition)", expanded=False):
+elif not debts:
     st.markdown("""
-    <div class='advisor-text'>
-
-    **1. 🎯 Use Tax Refunds as a Lump Sum**  
-    The average W-2 refund is $3,000+. Direct 100% to your highest-interest debt immediately in February/March each year.
-
-    **2. 📅 Make Bi-Weekly Payments**  
-    Pay half your monthly payment every 2 weeks instead of monthly. You'll make 26 half-payments = 13 full payments/year (1 extra!) — saving months off your timeline.
-
-    **3. 💼 Negotiate a Raise → Dedicate It Entirely**  
-    If you get a 5% raise, you weren't living on that money before. Throw 100% of the increase at debt until you're free.
-
-    **4. 💳 Balance Transfer (Credit Cards)**  
-    Move high-rate credit card balances to a 0% APR promotional card (usually 12-18 months). Pay aggressively with zero interest going to the principal.
-
-    **5. 🏠 Refinance Your Mortgage**  
-    If rates dropped since you got your mortgage, refinancing to a lower rate or shorter term saves tens of thousands. Check if the break-even period makes sense for you.
-
-    **6. 📊 Request a Credit Limit Increase (Don't Spend It)**  
-    Improves your credit utilization ratio → raises your credit score → qualifies you for lower-rate refinancing or balance transfers.
-
-    **7. 🛍️ Sell Unused Assets**  
-    Old car, gear, electronics, clothes. Even $500 applied to a high-interest balance removes $100+/year in interest immediately.
-
-    **8. 💡 Reduce Lifestyle Inflation**  
-    Every $100/month in spending cuts = $1,200/year extra toward debt. Track 3 months of spending — most people find 10-15% they don't notice or care about.
-
-    **9. 🎁 Apply Bonuses, RSUs, and Overtime 100%**  
-    W-2 employees often receive year-end bonuses or overtime pay. Treat these as windfalls, not income — send them straight to debt.
-
-    **10. 📈 Request W-4 Adjustment**  
-    If you're getting a large tax refund, you're giving the IRS an interest-free loan. Adjust your W-4 to get that money monthly — then apply it to debt immediately instead of waiting for refund season.
-
-    </div>
-    """, unsafe_allow_html=True)
-
-# ── EMPTY STATE ──────────────────────────────
-if not debts:
-    st.markdown("""
-    <div style='text-align:center;padding:4rem 2rem;'>
-      <div style='font-size:4rem;'>💳</div>
-      <div style='font-size:1.4rem;font-weight:600;color:#e6edf3;margin-top:1rem;'>Ready to Become Debt-Free?</div>
-      <div style='color:#8b949e;margin-top:0.5rem;max-width:500px;margin-left:auto;margin-right:auto;'>
-        Start by entering your income on the left, then add your debts (car loans, credit cards, mortgage, etc.) 
-        to get your personalized payoff plan and smart advisor recommendations.
+    <div style='text-align:center;padding:5rem 2rem;'>
+      <div style='font-size:3.5rem;'>🏦</div>
+      <div style='font-size:1.4rem;font-weight:600;color:#e6edf3;margin-top:1rem;'>Now add your debts</div>
+      <div style='color:#8b949e;margin-top:.5rem;max-width:460px;margin-left:auto;margin-right:auto;'>
+        Add each debt on the left — just the balance, type, and APR.
+        No minimum payment needed. We calculate it for you based on industry-standard rules.
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-# ── FOOTER ───────────────────────────────────
 st.markdown("---")
-st.markdown("""
-<div style='text-align:center;color:#484f58;font-size:0.78rem;padding:1rem;'>
-DebtFree Advisor • For informational purposes only • Not a substitute for licensed financial advice<br>
-Built for W-2 employees working toward financial freedom 💪
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center;color:#484f58;font-size:.75rem;'>DebtFree Advisor v2 • Informational only • Not a substitute for licensed financial advice</div>", unsafe_allow_html=True)
